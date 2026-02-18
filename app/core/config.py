@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     DEBUG: bool 
     VERSION: str
 
+    # =========================
+    # BACKBLAZE B2
+    # =========================
+    B2_KEYID: str
+    B2_KEYNAME: str
+    B2_APPLICATIONKEY: str
+    B2_ENDPOINT_URL: str
+
+
     class Config:
         env_file = ".env"
 
