@@ -9,6 +9,8 @@ from app.models.role import Role
 from app.schemas.user import UserCreate, UserLogin
 from app.core.security import hash_password, verify_password
 from app.core.security import create_access_token, create_refresh_token, refresh_token
+from app.models.folder import Folder 
+
 import uuid
 from datetime import datetime
 
@@ -46,8 +48,19 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
         expires_at= None
     )
 
+    root_folder = Folder(
+        id= uuid.uuid4(),
+        user_id=new_user.id,
+        name="root",
+        parent_id=None,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+
     db.add(new_user)
     db.add(user_plan)
+    db.add(root_folder)
     db.commit()
     db.refresh(new_user)
 
@@ -61,6 +74,7 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
         secure=False,
         samesite="lax",
         )
+    
     
     return {
         "access_token": access_token,
