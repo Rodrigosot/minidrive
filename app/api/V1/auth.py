@@ -59,6 +59,7 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
 
 
     db.add(new_user)
+    db.flush()  # Asegura que new_user.id esté disponible para root_folder
     db.add(user_plan)
     db.add(root_folder)
     db.commit()
