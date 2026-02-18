@@ -1,0 +1,63 @@
+# =========================
+# 🔐 ENV FILES (SECRETOS)
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# 🐍 PYTHON
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribución / build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Entornos virtuales
+venv/
+env/
+ENV/
+.venv/
+
+# =========================
+# 🧪 TEST / COVERAGE
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =========================
+# 🧱 DATABASE
+# =========================
+*.db
+*.sqlite3
+
+# =========================
+# 🐳 DOCKER
+# =========================
+docker-compose.override.yml
+
+# =========================
+# 🧠 IDE / EDITORES
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# 💻 SISTEMA OPERATIVO
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# 📦 LOGS
+# =========================
+*.log
+logs/
