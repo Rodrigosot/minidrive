@@ -69,9 +69,7 @@ def move_folder(folder_id:uuid.UUID, new_parent_id: uuid.UUID, db: Session = Dep
     return {"message": "Folder moved successfully"}
 
 # crear carpeta
-from fastapi import Body
-
-@router.post("/{parent_folder_id}")
+@router.post("/{parent_folder_id}/create")
 def create_folder(
     parent_folder_id: uuid.UUID,
     folder: FolderCreate, 
