@@ -7,6 +7,7 @@ from app.api.V1.health import router as health_router
 from app.api.V1.users import router as user_router
 from app.api.V1.auth import router as auth_router
 from app.api.V1.folder import router as folder_router
+from app.api.V1.file import router as file_router
 from app.core.config import settings
 
 app = FastAPI(title=settings.APP_NAME, version=settings.VERSION)
@@ -23,3 +24,4 @@ app.include_router(health_router, prefix="/api/v1")
 app.include_router(user_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(folder_router, prefix="/api/v1")
+app.include_router(file_router, prefix="/api/v1")
