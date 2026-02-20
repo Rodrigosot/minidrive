@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -54,6 +54,9 @@ def delete_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_u
 @router.put("/move")
 def move_folder(folder_id:uuid.UUID, new_parent_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
+
+    if folder.name == "root":
+        raise HTTPException(status_code=404, detail="folder root no puede ser movido")
 
     if not folder:
         return {"message": "Folder not found"}
