@@ -1,16 +1,56 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime, String, UUID
+from sqlalchemy import String, ForeignKey, DateTime, UUID
+from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 import uuid
 from app.core.database import Base
 
+
 class ActivityLog(Base):
     __tablename__ = "activitylogs"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, unique=True, default=uuid.uuid4, nullable=False)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    action = Column(String, nullable=False) # Descripción de la acción realizada
-    target_type = Column(String, nullable=True) # Tipo de entidad afectada (e.g., 'file', 'folder')
-    target_id = Column(UUID(as_uuid=True), nullable=True) # ID de la entidad afectada
-    details = Column(String, nullable=True) # Detalles adicionales sobre la acción
-    created_at = Column(DateTime, default=datetime.utcnow)
-    ip_address = Column(String, nullable=True) # Dirección IP desde donde se realizó la acción
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        nullable=False
+    )
+
+    action: Mapped[str] = mapped_column(
+        String,
+        nullable=False
+    )
+
+    # Tipo de entidad afectada (ej: 'file', 'folder')
+    target_type: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    # ID de la entidad afectada
+    target_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True
+    )
+
+    # Detalles adicionales
+    details: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False
+    )
+
+    ip_address: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True
+    )
