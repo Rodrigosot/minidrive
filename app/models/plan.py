@@ -7,13 +7,6 @@ from app.core.database import Base
 class Plan(Base):
     __tablename__ = "plans"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False
-    )
-
     name: Mapped[str] = mapped_column(
         String,
         unique=True,
@@ -30,3 +23,11 @@ class Plan(Base):
         Integer,
         nullable=False
     )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
+    )
+

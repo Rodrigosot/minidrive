@@ -8,13 +8,9 @@ from app.core.database import Base
 class FileShare(Base):
     __tablename__ = "fileshares"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        unique=True,
-        default=uuid.uuid4,
-        nullable=False,
-        
+    expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime,
+        nullable=True,
     )
 
     file_id: Mapped[uuid.UUID] = mapped_column(
@@ -29,14 +25,18 @@ class FileShare(Base):
         nullable=True,
     )
 
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        unique=True,
+        default=uuid.uuid4,
+        nullable=False,
+        
+    )
+
     shared_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
-    )
-
-    expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime,
-        nullable=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(

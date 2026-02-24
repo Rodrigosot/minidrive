@@ -7,14 +7,6 @@ from app.core.database import Base
 
 class UserPlan(Base):
     __tablename__ = "user_plans"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False
-    )
-
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
@@ -24,6 +16,18 @@ class UserPlan(Base):
     plan_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("plans.id"),
+        nullable=False
+    )
+
+    expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime,
+        nullable=True
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
         nullable=False
     )
 
@@ -45,7 +49,3 @@ class UserPlan(Base):
         nullable=False
     )
 
-    expires_at: Mapped[datetime | None] = mapped_column(
-        DateTime,
-        nullable=True
-    )

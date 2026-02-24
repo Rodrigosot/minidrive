@@ -8,13 +8,6 @@ from app.core.database import Base
 class Folder(Base):
     __tablename__ = "folders"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-        nullable=False
-    )
-
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("users.id"),
@@ -30,6 +23,13 @@ class Folder(Base):
         UUID(as_uuid=True),
         ForeignKey("folders.id"),
         nullable=True
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        nullable=False
     )
 
     created_at: Mapped[datetime] = mapped_column(
