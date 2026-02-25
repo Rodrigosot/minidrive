@@ -46,6 +46,11 @@ class File(Base):
         nullable=False
     )
 
+    
+    deleted_at : Mapped[datetime] = mapped_column(
+        DateTime, 
+        nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow
@@ -63,9 +68,3 @@ class File(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
-
-    is_deleted: Mapped[bool] = mapped_column(
-        Boolean, 
-        default= False
-
-    ) 
