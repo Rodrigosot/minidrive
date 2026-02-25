@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from app.models.fileshare import FileShare
 from app.models.folder import Folder
 from app.models.file import File
 from app.services.file_service import delete_file_from_b2
@@ -8,11 +9,12 @@ def delete_folder_recursive(folder: Folder, db: Session):
 
     for file in files:
         delete_file_from_b2(file.path)  # Eliminar el archivo de B2
+        db.query(FileShare).filter(FileShare.file_id == file.id).delete()
+        db.delete(file)
 
-    db.query(File).filter(File.folder_id == folder.id).delete()
     subfolders = db.query(Folder).filter(Folder.parent_id == folder.id).all()
     for sub in subfolders:
         delete_folder_recursive(sub, db)
     
-    db.flush() 
+    
     db.delete(folder)

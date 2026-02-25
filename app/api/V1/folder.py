@@ -15,7 +15,7 @@ router = APIRouter(prefix="/folder", tags=["Folders"])
 def read_root_folder(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     root_folder = db.query(Folder).filter(Folder.user_id == current_user.id, Folder.parent_id == None).first()
 
-    files = db.query(File).filter(File.folder_id == root_folder.id).all()
+    files = db.query(File).filter(File.folder_id == root_folder.id, File.deleted_at.is_(None)).all()
     folders = db.query(Folder).filter(Folder.parent_id == root_folder.id).all()
 
 
@@ -30,10 +30,11 @@ def read_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_use
 
 
     folders = db.query(Folder).filter(Folder.parent_id == folder_id).all()
-    files = db.query(File).filter(File.folder_id == folder_id).all()
+    files = db.query(File).filter(File.folder_id == folder_id, File.deleted_at.is_(None)).all()
     return {"message": "Folder details", "folder_data": folder, "files": files, "folders": folders}
 
 # Borrar carpeta y su contenido
+# Agregar soft-hard delete
 @router.delete("/")
 def delete_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
