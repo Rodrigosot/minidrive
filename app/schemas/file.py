@@ -14,3 +14,12 @@ class ShareFileSchema(BaseModel):
     expires_in_minutes: Optional[int] = 0
     forever: Optional[bool] = False
 
+class FileResponse(BaseModel):
+    id: uuid.UUID
+    folder_id: uuid.UUID
+    name: str
+    size: int
+    mime_type: str
+
+class MoveFileSchema(BaseModel):
+    new_folder_id: uuid.UUID
