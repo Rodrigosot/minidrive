@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session, aliased
 from app.core.database import get_db
 from app.core.security import get_current_user
 from app.models.folder import Folder
 from app.models.file import File
 import uuid
 from app.schemas.folder import FolderCreate, FolderRename
-from app.services.folder_service import delete_folder_recursive
+from app.services.folder_service import delete_folder_recursive, recovery_folder, soft_delete_folder_recursive
 
+Parent = aliased(Folder)
 
 router = APIRouter(prefix="/folder", tags=["Folders"])
 
@@ -33,23 +35,82 @@ def read_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_use
     files = db.query(File).filter(File.folder_id == folder_id, File.deleted_at.is_(None)).all()
     return {"message": "Folder details", "folder_data": folder, "files": files, "folders": folders}
 
+ 
+@router.get("/trash")
+def get_deleted(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    
+    
+    folders = ( 
+        db.query(Folder)
+        .outerjoin(Parent, Folder.parent_id==Parent.id).
+        filter(
+            Folder.user_id == current_user.id,
+            Folder.deleted_at.is_not(None),
+            Parent.deleted_at.is_(None)).all() 
+)
+
+    
+    files = (
+    db.query(File)
+    .join(Folder, File.folder_id == Folder.id)
+    .filter(
+        File.user_id == current_user.id,
+        File.deleted_at.isnot(None),
+        Folder.deleted_at.is_(None)
+    )
+    .all()
+)
+    return {
+        "files": files,
+        "folders": folders
+    }
+
+@router.post("/{folder_id}/restore")
+def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
+
+    if not folder:
+        raise HTTPException(
+            status_code=404, 
+            detail="folder not found"
+            )
+    
+    if folder.deleted_at is None:
+          raise HTTPException(
+            status_code=400,
+            detail="folder is not deleted"
+        )
+    
+    recovery_folder(folder, db)
+    db.commit()
+
+    return {"message": " Folder restored successfoly"}
+
 # Borrar carpeta y su contenido
 # Agregar soft-hard delete
 @router.delete("/")
 def delete_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
 
-    if folder.name == "root":
-        return {"message": "Cannot delete root folder"}
-
     if not folder:
         return {"message": "Folder not found"}
 
-    delete_folder_recursive(folder, db)
+
+    if folder.name == "root" and folder.parent_id == None:
+        return {"message": "Cannot delete root folder"}
+
+
+    if folder.deleted_at is None: 
+        soft_delete_folder_recursive(folder, db)
+        msg = "Folder moved to trash"
+
+    else:
+        delete_folder_recursive(folder, db)
+        msg = "Folder and its contents deleted permanently"
+
 
     db.commit()
-
-    return {"message": "Folder and its contents deleted successfully"}
+    return {"message": msg}
 
 # Mover carpeta a otra carpeta
 @router.put("/move")
@@ -100,7 +161,6 @@ def create_folder(
 
     return {"message": "Folder created successfully", "folder": new_folder}
 
-
 # renombrar carpeta
 @router.put("/rename")
 def rename_folder(folder: FolderRename, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
@@ -108,6 +168,9 @@ def rename_folder(folder: FolderRename, db: Session = Depends(get_db), current_u
 
     if not existing_folder:
         return {"message": "Folder not found"}
+    
+    if existing_folder.name == "root" and existing_folder.parent_id == None: 
+        return {"message" : "Folder root cant rename"} 
     
     existing_folder.name = folder.name
     db.commit()
