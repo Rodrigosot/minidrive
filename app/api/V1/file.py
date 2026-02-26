@@ -14,7 +14,7 @@ from app.services.file_service import delete_file_from_b2, download_file_from_b2
 router = APIRouter(prefix="/file", tags=["file"])
 # Subir archivo
 @router.post("/{folder_id}/upload")
-def upload_file(folder_id: str, file: UploadFile, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def upload_file(folder_id: uuid.UUID, file: UploadFile, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     
     file_upload = upload_file_to_b2(folder_id=folder_id, file=file, db=db, user_id=current_user.id)
     return {"message": "Archivo subido exitosamente", "file": file_upload}
@@ -22,7 +22,7 @@ def upload_file(folder_id: str, file: UploadFile, db: Session = Depends(get_db),
 
 # Descargar archivo
 @router.get("/{file_id}/download")
-def download_file(file_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def download_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
 
     ## Crear funcion get_accesible_file, para evitar reutilizar codigo xd
 
@@ -39,24 +39,29 @@ def download_file(file_id: str, db: Session = Depends(get_db), current_user=Depe
 def restore_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     file = db.query(File).filter(File.id == file_id, File.user_id == current_user.id).first()
 
-
-
     if not file:
         raise HTTPException(
             status_code=404,
             detail="File not found"
             )
     
+    folder = db.query(Folder.id == file.folder_id, Folder.user_id == current_user.id).first()
+
     if file.deleted_at is None:
         raise HTTPException(
             status_code=400,
             detail="file is not deleted"
         )    
+
+    if not folder or getattr(folder, "deleted_at", None) is not None:
+        root_folder = db.query(Folder).filter(Folder.user_id == current_user.id, Folder.parent_id.is_(None), Folder.name == "root").first()
+
+        file.folder_id = root_folder.id
     
     file.deleted_at = None
 
     db.commit()
-
+    return {"message": "File restored succesfully", file_id: str(file_id)}
 
 
 
@@ -163,15 +168,6 @@ def get_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user = D
 
     return file
     
-
-# Ver archivos en la papelera implementar despues   
-@router.get("/trash")
-def get_file_deleted(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    "Logica para mostrar todos los archivos eliminados"
-
-
-
-
 # Compartir archivo con otro usuario
 @router.post("/{file_id}/share")
 def share_file(file_id : uuid.UUID,share_data: ShareFileSchema, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
