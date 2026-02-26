@@ -6,8 +6,10 @@ from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.models.file import File
 import uuid
+from fastapi import HTTPException
 from app.core.config import settings
 from app.models.fileshare import FileShare
+from app.models.folder import Folder
 
 
 def upload_file_to_b2(
@@ -18,11 +20,17 @@ def upload_file_to_b2(
 ):
     b2_key = str(uuid.uuid4())
 
+    folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == user_id, Folder.deleted_at.is_(None)).first()
+    if not folder:
+        raise HTTPException(
+            status_code=404,
+            detail="folder not found"
+        )
+    
     content = file.file.read()
 
     size = len(content)
-    file_hash = hashlib.sha256(content).hexdigest()
-
+    file_hash = hashlib.sha256(content).hexdigest()    
     s3.upload_fileobj(BytesIO(content), settings.B2_KEYNAME, b2_key, ExtraArgs={'ContentType': file.content_type})
 
     new_file = File(
