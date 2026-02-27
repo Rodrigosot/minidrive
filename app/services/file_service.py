@@ -44,6 +44,7 @@ def upload_file_to_b2(
         hash=file_hash, 
         created_at=datetime.utcnow(),
         updated_at=datetime.utcnow(),
+        deleted_at=None
     )
 
     db.add(new_file)
@@ -61,7 +62,7 @@ def download_file_from_b2(path):
 
 
 def get_accesible_file(db: Session, file_id: str, user_id: str):
-    file = db.query(File).filter(File.id == file_id, File.is_deleted == False).first()
+    file = db.query(File).filter(File.id == file_id, File.deleted_at.is_(None)).first()
 
     if not file:
         return None
