@@ -36,12 +36,14 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
         username=user.username,
         email=user.email,
         hashed_password=hash_password(user.password),  
-        created_at=datetime.utcnow()
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
 
     user_plan = UserPlan(
         user_id=new_user.id,
         plan_id=free_plan.id,
+        id=uuid.uuid4(),
         storage_used=0,
         active=True,
         started_at=datetime.utcnow(),
