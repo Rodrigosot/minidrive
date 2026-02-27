@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased
@@ -7,6 +9,7 @@ from app.models.folder import Folder
 from app.models.file import File
 import uuid
 from app.schemas.folder import FolderCreate, FolderRename
+from app.services.file_service import delete_file_from_b2
 from app.services.folder_service import delete_folder_recursive, recovery_folder, soft_delete_folder_recursive
 
 Parent = aliased(Folder)
@@ -17,11 +20,78 @@ router = APIRouter(prefix="/folder", tags=["Folders"])
 def read_root_folder(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     root_folder = db.query(Folder).filter(Folder.user_id == current_user.id, Folder.parent_id == None).first()
 
+
+    print(root_folder.id)
     files = db.query(File).filter(File.folder_id == root_folder.id, File.deleted_at.is_(None)).all()
     folders = db.query(Folder).filter(Folder.parent_id == root_folder.id).all()
 
 
     return {"message": "Root folder for the authenticated user", "folder": root_folder, "files": files, "folders": folders}
+
+
+@router.post("/trash/restore-all")
+def restore_all_trash(db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+    folders = db.query(Folder).filter(Folder.user_id==current_user.id, Folder.deleted_at.isnot(None)).all()
+    for folder in folders:
+        parent = db.query(Folder).filter(Folder.id==folder.parent_id).first()
+        if not parent or parent.deleted_at:
+            root = db.query(Folder).filter(Folder.user_id==current_user.id, Folder.name=="root", Folder.parent_id.is_(None)).first()
+            folder.parent_id = root.id
+        recovery_folder(folder, db)
+    
+    files = (
+        db.query(File)
+        .join(Folder, File.folder_id==Folder.id)
+        .filter(File.user_id==current_user.id, File.deleted_at.isnot(None), Folder.deleted_at.is_(None))
+        .all()
+    )
+    for f in files:
+        f.deleted_at = None
+    
+    db.commit()
+    return {"message": f"Restored {len(folders)} folders and {len(files)} files from trash"}
+
+router.post("/empty-trash")
+def empty_trash(db: Session = Depends(get_db), current_user= Depends(get_current_user)):
+
+    files = db.query(File).join(Folder, File.folder_id == Folder.id).filter(
+        File.deleted_at.isnot(None),
+        Folder.deleted_at.is_(None),  
+        File.user_id == current_user.id
+    ).all()
+
+    for file in files:
+        delete_file_from_b2(file.path)
+        db.delete(file)
+
+    folders = db.query(Folder).filter(Folder.deleted_at.isnot(None), Folder.user_id == current_user.id).all()
+
+    for sub in folders:
+        delete_folder_recursive(sub, db)
+    db.commit()
+
+    return {"message": "Trash emptied successfully"}
+    
+
+
+@router.get("/trash")
+def get_deleted(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    folders = db.query(Folder).outerjoin(Parent, Folder.parent_id==Parent.id).filter(
+            Folder.user_id == current_user.id,
+            Folder.deleted_at.is_not(None),
+            Parent.deleted_at.is_(None)).all() 
+    
+    files = db.query(File).join(Folder, File.folder_id == Folder.id).filter(
+        File.user_id == current_user.id,
+        File.deleted_at.isnot(None),
+        Folder.deleted_at.is_(None)
+    ).all()
+
+    return {
+        "files": files,
+        "folders": folders
+    }
+
 
 @router.get("/{folder_id}")
 def read_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
@@ -35,35 +105,35 @@ def read_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_use
     files = db.query(File).filter(File.folder_id == folder_id, File.deleted_at.is_(None)).all()
     return {"message": "Folder details", "folder_data": folder, "files": files, "folders": folders}
 
- 
-@router.get("/trash")
-def get_deleted(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    
-    
-    folders = ( 
-        db.query(Folder)
-        .outerjoin(Parent, Folder.parent_id==Parent.id).
-        filter(
-            Folder.user_id == current_user.id,
-            Folder.deleted_at.is_not(None),
-            Parent.deleted_at.is_(None)).all() 
-)
+@router.get("/{folder_id}/trash")
+def read_deleted_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    folder = db.query(Folder).filter(
+        Folder.id == folder_id, 
+        Folder.user_id == current_user.id,
+        Folder.deleted_at.is_not(None)
+    ).first()
 
-    
-    files = (
-    db.query(File)
-    .join(Folder, File.folder_id == Folder.id)
-    .filter(
-        File.user_id == current_user.id,
-        File.deleted_at.isnot(None),
-        Folder.deleted_at.is_(None)
-    )
-    .all()
-)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Deleted folder not found")
+
+    # Subcarpetas borradas
+    folders = db.query(Folder).filter(
+        Folder.parent_id == folder_id,
+        Folder.deleted_at.is_not(None)
+    ).all()
+
+    # Archivos borrados dentro de esta carpeta
+    files = db.query(File).filter(
+        File.folder_id == folder_id,
+        File.deleted_at.is_not(None)
+    ).all()
+
     return {
-        "files": files,
-        "folders": folders
+        "folder_data": folder,
+        "folders": folders,
+        "files": files
     }
+ 
 
 @router.post("/{folder_id}/restore")
 def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_user = Depends(get_current_user)):
@@ -81,10 +151,17 @@ def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_u
             detail="folder is not deleted"
         )
     
+    folder_parent = db.query(Folder).filter(Folder.id == folder.parent_id, Folder.user_id == current_user.id).first()
+
+
+    if not folder_parent or folder_parent.deleted_at is not None:
+        root_folder = db.query(Folder).filter(Folder.user_id == current_user.id, Folder.name == "root", Folder.parent_id.is_(None)).first()
+        folder.parent_id = root_folder.id
+    
     recovery_folder(folder, db)
     db.commit()
 
-    return {"message": " Folder restored successfoly"}
+    return {"message": "Folder restored successfully"}
 
 # Borrar carpeta y su contenido
 # Agregar soft-hard delete
@@ -152,7 +229,10 @@ def create_folder(
     new_folder = Folder(
         name=folder.name,  # ahora viene del body
         user_id=current_user.id,
-        parent_id=parent_folder_id
+        parent_id=parent_folder_id,
+        updated_at=datetime.utcnow(),
+        created_at=datetime.utcnow(),
+        id=uuid.uuid4()
     )
 
     db.add(new_folder)
