@@ -38,6 +38,13 @@ class Folder(Base):
         nullable=False
     )
 
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=None,
+        nullable=True
+    )
+    
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,
         default=datetime.utcnow,
