@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.models.fileshare import FileShare
 from app.models.folder import Folder
 from app.models.file import File
 import uuid
@@ -27,6 +28,16 @@ def read_root_folder(request: Request, db: Session = Depends(get_db), current_us
 
 
     return {"message": "Root folder for the authenticated user", "folder": root_folder, "files": files, "folders": folders}
+
+
+@router.get("/shared-with-me")
+def get_shared_files(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+    files_shared_with_me = db.query(File).join(FileShare, FileShare.file_id == File.id).filter(FileShare.shared_with_user_id == current_user.id, or_(
+    FileShare.expires_at == None,
+    FileShare.expires_at > datetime.now(timezone.utc)   
+), File.deleted_at.is_(None)).all()
+
+    return files_shared_with_me
 
 
 @router.post("/trash/restore-all")
