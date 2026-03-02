@@ -10,6 +10,7 @@ from app.models.folder import Folder
 from app.models.file import File
 import uuid
 from app.schemas.folder import FolderCreate, FolderRename
+from app.services.activitylog_service import ActivityAction, ActivityLogService, TargetType
 from app.services.file_service import delete_file_from_b2
 from app.services.folder_service import delete_folder_recursive, recovery_folder, soft_delete_folder_recursive
 
@@ -177,7 +178,7 @@ def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_u
 # Borrar carpeta y su contenido
 # Agregar soft-hard delete
 @router.delete("/")
-def delete_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def delete_folder(request:Request,folder_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
 
     if not folder:
@@ -189,7 +190,7 @@ def delete_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), current_u
 
 
     if folder.deleted_at is None: 
-        soft_delete_folder_recursive(folder, db)
+        soft_delete_folder_recursive(folder, db, current_user.id, request)
         msg = "Folder moved to trash"
 
     else:
@@ -249,6 +250,8 @@ def create_folder(
     db.add(new_folder)
     db.commit()
     db.refresh(new_folder)
+
+    ActivityLogService.log(user_id=current_user.id, action=ActivityAction.CREATE_FOLDER, target_type=TargetType.FOLDER, target_id=new_folder.id, details=f"User {current_user.id} created succesfully folder:{new_folder.id} ")
 
     return {"message": "Folder created successfully", "folder": new_folder}
 
