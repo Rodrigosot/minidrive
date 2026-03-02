@@ -10,7 +10,7 @@ from app.schemas.user import UserCreate, UserLogin
 from app.core.security import hash_password, verify_password
 from app.core.security import create_access_token, create_refresh_token, refresh_token
 from app.models.folder import Folder 
-
+from app.services.activitylog_service import ActivityLogService, ActivityAction, TargetType
 import uuid
 from datetime import datetime
 
@@ -19,7 +19,6 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/")
 @limiter.limit("5/minute")
 def create_user(request: Request ,user: UserCreate, response:Response, db: Session = Depends(get_db)):
-    
     # Buscar rol "user"
     existing_user = db.query(User).filter(User.email == user.email).first()
 
@@ -28,8 +27,6 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
 
     role = db.query(Role).filter(Role.name == "user").first()
     free_plan = db.query(Plan).filter(Plan.name == "Gratis").first()
-
-    
     new_user = User(
         id=uuid.uuid4(),
         role_id=role.id,
@@ -67,6 +64,7 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
     db.commit()
     db.refresh(new_user)
 
+    client_ip = request.client.host
     access_token = create_access_token({"sub": str(new_user.id)})
     refresh_token = create_refresh_token({"sub": str(new_user.id)})
 
@@ -78,7 +76,9 @@ def create_user(request: Request ,user: UserCreate, response:Response, db: Sessi
         samesite="lax",
         )
     
+    ActivityLogService.log(db=db,action=ActivityAction.REGISTER , user_id=new_user.id, target_type= TargetType.USER, target_id=new_user.id, details=f"Ha sido registrado user: {new_user.id}", ip_address=client_ip)
     
+    db.commit()
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -101,6 +101,8 @@ def login(request: Request, res:Response, user: UserLogin, db: Session = Depends
         secure=False,
         samesite="lax",
     )
+
+    ActivityLogService.log(db=db, action=ActivityAction.LOGIN,  user_id=existing_user.id, target_type=None, target_id=existing_user.id, details=f"User {user.id} login succesfuly")
 
     return {
         "access_token": access_token,
