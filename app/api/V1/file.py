@@ -9,22 +9,25 @@ from app.models.folder import Folder
 from app.models.user import User
 from app.schemas.file import FileRename, FileResponse, MoveFileSchema, ShareFileSchema
 from app.models.fileshare import FileShare
+from app.services.activitylog_service import ActivityAction, ActivityLogService, TargetType
 from app.services.file_service import delete_file_from_b2, download_file_from_b2, get_accesible_file, upload_file_to_b2
 
 router = APIRouter(prefix="/file", tags=["file"])
 # Subir archivo
 @router.post("/{folder_id}/upload")
-def upload_file(folder_id: uuid.UUID, file: UploadFile, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def upload_file(request: Request,folder_id: uuid.UUID, file: UploadFile, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     
     file_upload = upload_file_to_b2(folder_id=folder_id, file=file, db=db, user_id=current_user.id)
+
+    client_ip = request.client.host
+    ActivityLogService.log(db=db, user_id=current_user.id, action=ActivityAction.UPLOAD_FILE, target_type=TargetType.FILE, target_id=file_upload.id, details=f"User upload {file_upload.id}", ip_address=client_ip)
+
     return {"message": "Archivo subido exitosamente", "file": file_upload}
 
 
 # Descargar archivo
 @router.get("/{file_id}/download")
 def download_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
-
-    ## Crear funcion get_accesible_file, para evitar reutilizar codigo xd
 
     file = get_accesible_file(db, file_id, current_user.id)
 
@@ -68,21 +71,37 @@ def restore_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user
 
 # Borrar archivo
 @router.delete("/{file_id}")
-def delete_file(file_id: str, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
+def delete_file(request: Request,file_id: uuid.UUID, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
     file = db.query(File).filter(File.id == file_id, File.user_id == current_user.id).first()
+
+    client_host = request.client.host
 
     if not file:
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
     if file.deleted_at is not None:
-            delete_file_from_b2(file.path)
+            
+            try: 
+                delete_file_from_b2(file.path)
+            except Exception: 
+                    raise HTTPException(status_code=500, detail="Error deleting file from storage")
+            
+            fileShare = db.query(FileShare).filter(FileShare.file_id == file.id).all()
+                
+            for share in fileShare:
+                    db.delete(share)
             db.delete(file)
             db.commit()
+
+            ActivityLogService.log(db=db, user_id= current_user.id, action=ActivityAction.PERMANENT_DELETE_FILE, target_type=TargetType.FILE, target_id=file.id, details=f"", ip_address= client_host)
+
 
             return {"message": "Archivo eliminado exitosamente"}
 
     file.deleted_at = datetime.now(timezone.utc)
     db.commit()
+
+    ActivityLogService.log(db=db, user_id= current_user.id, action=ActivityAction.SOFT_DELETE_FILE, target_type=TargetType.FILE, target_id=file.id, details=f"", ip_address= client_host)
 
     return {"message": "Archivo puesto en la papelera"}
 
@@ -187,6 +206,13 @@ def share_file(file_id : uuid.UUID,share_data: ShareFileSchema, db: Session = De
         minutes= share_data.expires_in_minutes or 0,
         )
 
+    if expires_at and expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(
+        status_code=400,
+        detail="Expiration time must be in the future"
+    )
+
+
     user_to_share = db.query(User).filter(User.email == share_data.email).first()
 
     if not user_to_share:
@@ -203,7 +229,6 @@ def share_file(file_id : uuid.UUID,share_data: ShareFileSchema, db: Session = De
     if not file:
         raise HTTPException(status_code=404, detail="File not found")
 
-
     existing_share = db.query(FileShare).filter(FileShare.file_id == file_id, FileShare.shared_with_user_id == user_to_share.id  ).first()
 
     if existing_share:
@@ -217,9 +242,6 @@ def share_file(file_id : uuid.UUID,share_data: ShareFileSchema, db: Session = De
         "expires_at": expires_at
     }
     
-
-
-
     file_share = FileShare(
         id= uuid.uuid4(),
         file_id= file_id,
@@ -232,6 +254,8 @@ def share_file(file_id : uuid.UUID,share_data: ShareFileSchema, db: Session = De
     db.add(file_share)
     db.commit()
     db.refresh(file_share)
+
+    ActivityLogService.log(db= db, user_id=current_user.id, action=ActivityAction.SHARE_FILE, target_type=TargetType.FILE, target_id=file.id, details=f"File {file.id} shared with user {user_to_share.id}")
 
     return {
         "message": "File shared, succesfully",
