@@ -61,7 +61,7 @@ def download_file_from_b2(path):
     return s3.generate_presigned_url('get_object', Params={'Bucket': settings.B2_KEYNAME, 'Key': path}, ExpiresIn=3600)
 
 
-def get_accesible_file(db: Session, file_id: str, user_id: str):
+def get_accesible_file(db: Session, file_id: uuid.UUID, user_id: str):
     file = db.query(File).filter(File.id == file_id, File.deleted_at.is_(None)).first()
 
     if not file:
