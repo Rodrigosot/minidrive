@@ -39,7 +39,7 @@ def download_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_use
 
 
 @router.post("/{file_id}/restore")
-def restore_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def restore_file(request: Request,file_id: uuid.UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     file = db.query(File).filter(File.id == file_id, File.user_id == current_user.id).first()
 
     if not file:
@@ -62,7 +62,9 @@ def restore_file(file_id: uuid.UUID, db: Session = Depends(get_db), current_user
         file.folder_id = root_folder.id
     
     file.deleted_at = None
+    ip_addres = request.client.host
 
+    ActivityLogService.log(db=db, user_id=current_user.id, action=ActivityAction.RESTORE_FILE, target_type=TargetType.FILE, target_id=file.id, ip_address=ip_addres, details=f"File restored succesfully with id {file.id}")
     db.commit()
     return {"message": "File restored succesfully", file_id: str(file_id)}
 
