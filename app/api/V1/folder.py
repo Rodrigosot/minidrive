@@ -194,7 +194,7 @@ def delete_folder(request:Request,folder_id: uuid.UUID, db: Session = Depends(ge
         msg = "Folder moved to trash"
 
     else:
-        delete_folder_recursive(folder, db)
+        delete_folder_recursive(folder, db, current_user, request)  
         msg = "Folder and its contents deleted permanently"
 
 
