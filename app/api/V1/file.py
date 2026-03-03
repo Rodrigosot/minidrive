@@ -64,11 +64,9 @@ def restore_file(request: Request,file_id: uuid.UUID, db: Session = Depends(get_
     file.deleted_at = None
     ip_addres = request.client.host
 
-    ActivityLogService.log(db=db, user_id=current_user.id, action=ActivityAction.RESTORE_FILE, target_type=TargetType.FILE, target_id=file.id, ip_address=ip_addres, details=f"File restored succesfully with id {file.id}")
+    ActivityLogService.log(db=db, user_id=current_user.id, action=ActivityAction.RESTORE_FILE, target_type=TargetType.FILE, target_id=file.id, ip_address=ip_addres, details=f"File restored succesfully id {file.id}")
     db.commit()
     return {"message": "File restored succesfully", file_id: str(file_id)}
-
-
 
 
 # Borrar archivo
@@ -95,7 +93,7 @@ def delete_file(request: Request,file_id: uuid.UUID, db: Session = Depends(get_d
             db.delete(file)
             db.commit()
 
-            ActivityLogService.log(db=db, user_id= current_user.id, action=ActivityAction.PERMANENT_DELETE_FILE, target_type=TargetType.FILE, target_id=file.id, details=f"", ip_address= client_host)
+            ActivityLogService.log(db=db, user_id= current_user.id, action=ActivityAction.PERMANENT_DELETE_FILE, target_type=TargetType.FILE, target_id=file.id, details=f"File '{file.name}' permanently deleted", ip_address= client_host)
 
 
             return {"message": "Archivo eliminado exitosamente"}
