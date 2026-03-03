@@ -54,15 +54,37 @@ def soft_delete_folder_recursive(folder: Folder, db: Session, current_user: User
         ip_address=request.client.host
     )
 
-def recovery_folder(folder: Folder, db: Session):
-    files = db.query(File).filter(File.folder_id == folder.id).all()
+def recovery_folder(request: Request,folder: Folder, db: Session, current_user: User):
+    files = db.query(File).filter(File.folder_id == folder.id, File.deleted_at.isnot(None)).all()
 
     for file in files:
+        ActivityLogService.log(
+        db=db,
+        user_id=current_user.id,
+        action=ActivityAction.RESTORE_FILE,
+        target_type=TargetType.FILE,
+        target_id=file.id, 
+        details=(
+            f"file recovery succesfuly {file.id}"
+        ),
+        ip_address=request.client.host)
         file.deleted_at = None
 
-    subfolders = db.query(Folder).filter(Folder.parent_id == folder.id).all()
+    subfolders = db.query(Folder).filter(Folder.parent_id == folder.id, Folder.deleted_at.isnot(None)).all()
 
     for sub in subfolders: 
-        recovery_folder(sub, db)
+        recovery_folder(request ,sub, db, current_user)
 
     folder.deleted_at = None
+    
+    ActivityLogService.log(
+        db=db,
+        user_id=current_user.id,
+        action=ActivityAction.RESTORE_FOLDER,
+        target_type=TargetType.FOLDER,
+        target_id=folder.id, 
+        details=(
+            f"folder recovery recursively | "
+            f"folder='{folder.name}' ({folder.id})"
+        ),
+        ip_address=request.client.host)
