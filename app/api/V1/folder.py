@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, aliased
@@ -148,7 +147,7 @@ def read_deleted_folder(folder_id: uuid.UUID, db: Session = Depends(get_db), cur
  
 
 @router.post("/{folder_id}/restore")
-def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+def restore_folder(request:Request ,folder_id: uuid.UUID,db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     folder = db.query(Folder).filter(Folder.id == folder_id, Folder.user_id == current_user.id).first()
 
     if not folder:
@@ -170,7 +169,8 @@ def restore_folder(folder_id: uuid.UUID,db: Session = Depends(get_db), current_u
         root_folder = db.query(Folder).filter(Folder.user_id == current_user.id, Folder.name == "root", Folder.parent_id.is_(None)).first()
         folder.parent_id = root_folder.id
     
-    recovery_folder(folder, db)
+    ip_address = request.client.host
+    recovery_folder(request,folder, db, current_user)
     db.commit()
 
     return {"message": "Folder restored successfully"}
